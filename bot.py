@@ -1,4 +1,6 @@
 import os
+from flask import Flask
+from threading import Thread
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -14,22 +16,29 @@ OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+app = Flask(__name__)
+
+
+@app.route("/")
+def home():
+    return "Telegram AI Bot is running!"
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "سلام 👋\n"
         "من ربات هوش مصنوعی تو هستم 🤖\n\n"
-        "هر چیزی می‌خوای ازم بپرس."
+        "پیامت رو بفرست."
     )
 
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        user_text = update.message.text
+        text = update.message.text
 
         response = client.responses.create(
             model="gpt-5-mini",
-            input=user_text,
+            input=text
         )
 
         await update.message.reply_text(response.output_text)
@@ -37,20 +46,27 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print("ERROR:", e)
         await update.message.reply_text(
-            "یه مشکلی پیش اومد 😕 دوباره امتحان کن."
+            "متأسفانه مشکلی پیش اومد 😕"
         )
 
 
-def main():
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(
+
+def main():
+    Thread(target=run_web, daemon=True).start()
+
+    bot = Application.builder().token(TELEGRAM_TOKEN).build()
+
+    bot.add_handler(CommandHandler("start", start))
+    bot.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, chat)
     )
 
     print("Bot is running...")
-    app.run_polling()
+    bot.run_polling()
 
 
 if __name__ == "__main__":
